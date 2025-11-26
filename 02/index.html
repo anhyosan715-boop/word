@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모던 스톱워치</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 커스텀 스타일: Inter 폰트 사용 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        :root {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* 랩 타임 리스트의 스크롤바 스타일링 (선택 사항) */
+        #laps-container::-webkit-scrollbar,
+        #history-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #laps-container::-webkit-scrollbar-thumb,
+        #history-container::-webkit-scrollbar-thumb {
+            background-color: #6366f1; /* Indigo-500 */
+            border-radius: 4px;
+        }
+        #laps-container::-webkit-scrollbar-track,
+        #history-container::-webkit-scrollbar-track {
+            background: #1f2937; /* Gray-800 */
+        }
+
+        /* 큰 시계 폰트 조정 */
+        #display {
+            font-variant-numeric: tabular-nums; /* 숫자 폭을 일정하게 유지 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-lg bg-gray-800 p-8 md:p-12 rounded-3xl shadow-2xl border-2 border-indigo-500">
+        <!-- 제목 -->
+        <h1 class="text-3xl md:text-4xl font-extrabold text-white text-center mb-10">
+            ⏰ 모던 스톱워치
+        </h1>
+
+        <!-- 시간 표시부 -->
+        <div id="display" class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light text-indigo-400 text-center mb-10 tracking-tighter">
+            00:00:00
+        </div>
+
+        <!-- 과목 입력 필드 (새로 추가) -->
+        <div class="mb-6">
+            <input type="text" id="subjectInput" placeholder="과목 또는 활동을 입력하세요 (예: 수학, 독서)"
+                   class="w-full p-3 rounded-xl bg-gray-700 text-white border border-indigo-500 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 placeholder-gray-400 text-base shadow-inner transition duration-150">
+        </div>
+
+        <!-- 제어 버튼 영역 -->
+        <div class="flex flex-wrap justify-center gap-4 mb-8">
+            <button id="startStopBtn" onclick="startStop()"
+                    class="flex-1 min-w-[120px] px-6 py-3 text-lg font-semibold text-white transition duration-200 rounded-full shadow-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transform hover:scale-105">
+                시작
+            </button>
+            <button id="lapResetBtn" onclick="lapReset()" disabled
+                    class="flex-1 min-w-[120px] px-6 py-3 text-lg font-semibold text-indigo-300 transition duration-200 rounded-full shadow-lg bg-gray-700 hover:bg-gray-600 active:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105">
+                랩
+            </button>
+        </div>
+
+        <!-- 기록된 세션 목록 (새로 추가) -->
+        <div class="mt-8">
+            <h2 class="text-xl font-bold text-white mb-4 border-b border-green-600 pb-2">기록된 세션</h2>
+            <div id="history-container" class="max-h-60 overflow-y-auto pr-2 mb-8">
+                <ul id="historyList" class="space-y-2">
+                    <!-- 기록된 세션 목록이 여기에 추가됩니다. -->
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 랩 타임 목록 (기존 목록) -->
+        <div class="mt-8">
+            <h2 class="text-xl font-bold text-white mb-4 border-b border-indigo-600 pb-2">랩 타임</h2>
+            <div id="laps-container" class="max-h-40 overflow-y-auto pr-2">
+                <ul id="lapsList" class="space-y-2">
+                    <!-- 랩 타임 목록이 여기에 추가됩니다. -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM 요소 가져오기
+        const display = document.getElementById('display');
+        const startStopBtn = document.getElementById('startStopBtn');
+        const lapResetBtn = document.getElementById('lapResetBtn');
+        const lapsList = document.getElementById('lapsList');
+        const subjectInput = document.getElementById('subjectInput'); // NEW
+        const historyList = document.getElementById('historyList'); // NEW
+
+        // 스톱워치 상태 변수
+        let startTime = 0; // 시작 시간 (milliseconds)
+        let elapsedTime = 0; // 경과 시간 (milliseconds)
+        let timerInterval; // setInterval ID
+        let isRunning = false; // 실행 상태
+        let lapCounter = 0; // 랩 번호 카운터
+
+        // 시간 포맷팅 함수 (HH:MM:SS)
+        function formatTime(ms) {
+            const totalMilliseconds = ms;
+            const hours = Math.floor(totalMilliseconds / 3600000);
+            const minutes = Math.floor((totalMilliseconds % 3600000) / 60000);
+            const seconds = Math.floor((totalMilliseconds % 60000) / 1000);
+
+            // 숫자 포맷팅: 00 형태로 맞추기
+            const pad = (num, digits = 2) => String(num).padStart(digits, '0');
+
+            const h = pad(hours);
+            const m = pad(minutes);
+            const s = pad(seconds);
+
+            // HH:MM:SS 형식으로 반환
+            return `${h}:${m}:${s}`;
+        }
+
+        // 디스플레이 업데이트
+        function updateDisplay() {
+            // 현재 경과 시간 계산
+            elapsedTime = Date.now() - startTime;
+            display.textContent = formatTime(elapsedTime);
+        }
+
+        // 시작 / 정지 버튼 핸들러
+        function startStop() {
+            if (isRunning) {
+                // 정지 (Stop)
+                clearInterval(timerInterval);
+                isRunning = false;
+                
+                // 버튼 텍스트 및 스타일 업데이트
+                startStopBtn.textContent = '재개';
+                startStopBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'active:bg-red-800');
+                startStopBtn.classList.add('bg-green-600', 'hover:bg-green-700', 'active:bg-green-800');
+
+                // 랩 버튼을 '기록 및 리셋' 버튼으로 변경
+                lapResetBtn.textContent = '기록 및 리셋'; // CHANGED TEXT
+                lapResetBtn.classList.remove('text-indigo-300', 'bg-gray-700', 'hover:bg-gray-600', 'active:bg-gray-900');
+                lapResetBtn.classList.add('text-white', 'bg-red-500', 'hover:bg-red-600', 'active:bg-red-700');
+                // 시간이 0이 아니면 활성화 (기록할 시간이 있다면)
+                lapResetBtn.disabled = (elapsedTime === 0); 
+
+                // 과목 입력 활성화 (기록을 위해)
+                subjectInput.disabled = false; // NEW
+
+            } else {
+                // 시작 또는 재개 (Start / Resume)
+                startTime = Date.now() - elapsedTime; // 정지된 시간부터 다시 시작
+                timerInterval = setInterval(updateDisplay, 10); // 10ms마다 업데이트
+                isRunning = true;
+                
+                // 버튼 텍스트 및 스타일 업데이트
+                startStopBtn.textContent = '정지';
+                startStopBtn.classList.remove('bg-green-600', 'hover:bg-green-700', 'active:bg-green-800');
+                startStopBtn.classList.add('bg-red-600', 'hover:bg-red-700', 'active:bg-red-800');
+
+                // '기록 및 리셋' 버튼을 랩 버튼으로 변경
+                lapResetBtn.textContent = '랩';
+                lapResetBtn.classList.remove('text-white', 'bg-red-500', 'hover:bg-red-600', 'active:bg-red-700');
+                lapResetBtn.classList.add('text-indigo-300', 'bg-gray-700', 'hover:bg-gray-600', 'active:bg-gray-900');
+                lapResetBtn.disabled = false;
+
+                // 과목 입력 비활성화 (측정 중에는 변경 불가)
+                subjectInput.disabled = true; // NEW
+            }
+        }
+
+        // 랩 / 기록 및 리셋 버튼 핸들러
+        function lapReset() {
+            if (isRunning) {
+                // 랩 타임 기록 (Lap)
+                lapCounter++;
+                const lapTimeFormatted = formatTime(elapsedTime);
+                
+                const listItem = document.createElement('li');
+                listItem.className = 'flex justify-between items-center p-3 bg-gray-700 rounded-xl shadow-md text-white border-l-4 border-indigo-500 transition duration-150 ease-in-out hover:bg-gray-600';
+                
+                // 랩 번호
+                const lapNumberSpan = document.createElement('span');
+                lapNumberSpan.className = 'font-bold text-indigo-400 text-lg';
+                lapNumberSpan.textContent = `랩 ${lapCounter}`;
+                
+                // 랩 시간
+                const lapTimeSpan = document.createElement('span');
+                lapTimeSpan.className = 'font-mono text-lg';
+                lapTimeSpan.textContent = lapTimeFormatted; 
+
+                listItem.appendChild(lapNumberSpan);
+                listItem.appendChild(lapTimeSpan);
+                
+                // 새로운 랩을 목록의 가장 위에 추가
+                lapsList.prepend(listItem);
+
+            } else {
+                // 기록 및 리셋 (Record & Reset) - !isRunning 상태
+                const subject = subjectInput.value.trim();
+                const sessionTime = elapsedTime;
+
+                if (sessionTime > 0 && subject) {
+                    // 세션 기록
+                    const sessionTimeFormatted = formatTime(sessionTime);
+                    
+                    const listItem = document.createElement('li');
+                    listItem.className = 'flex justify-between items-center p-3 bg-gray-700 rounded-xl shadow-md text-white border-l-4 border-green-500 transition duration-150 ease-in-out hover:bg-gray-600';
+                    
+                    // 과목 이름
+                    const subjectSpan = document.createElement('span');
+                    subjectSpan.className = 'font-bold text-green-400 text-lg truncate pr-2';
+                    subjectSpan.textContent = subject;
+                    
+                    // 시간
+                    const timeSpan = document.createElement('span');
+                    timeSpan.className = 'font-mono text-lg flex-shrink-0';
+                    timeSpan.textContent = sessionTimeFormatted; 
+
+                    listItem.appendChild(subjectSpan);
+                    listItem.appendChild(timeSpan);
+                    
+                    // 세션 기록을 기록 목록의 가장 위에 추가
+                    historyList.prepend(listItem);
+
+                    // 입력 필드 초기화
+                    subjectInput.value = '';
+
+                } else if (sessionTime > 0 && !subject) {
+                    // 시간이 있지만 과목이 입력되지 않았을 때
+                    
+                    // 사용자에게 시각적 피드백 제공: 입력 필드에 빨간 테두리를 잠시 표시
+                    subjectInput.classList.add('border-red-500');
+                    setTimeout(() => {
+                        subjectInput.classList.remove('border-red-500');
+                    }, 1000);
+                    
+                    // 기록하지 않았으므로 리셋하지 않고 함수 종료
+                    return; 
+                }
+
+                // --- 리셋 로직 (기록이 완료되었거나 sessionTime이 0일 때만 실행) ---
+                clearInterval(timerInterval);
+                elapsedTime = 0;
+                startTime = 0;
+                lapCounter = 0;
+                
+                display.textContent = formatTime(0); // 00:00:00으로 리셋
+                lapsList.innerHTML = ''; // 랩 목록 비우기
+
+                // 버튼 상태 리셋
+                startStopBtn.textContent = '시작';
+                startStopBtn.classList.remove('bg-green-600', 'hover:bg-green-700', 'active:bg-green-800');
+                startStopBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'active:bg-indigo-800');
+                
+                // 기록 및 리셋 버튼을 다시 랩 버튼으로 변경하고 비활성화
+                lapResetBtn.textContent = '랩';
+                lapResetBtn.classList.remove('text-white', 'bg-red-500', 'hover:bg-red-600', 'active:bg-red-700');
+                lapResetBtn.classList.add('text-indigo-300', 'bg-gray-700', 'hover:bg-gray-600', 'active:bg-gray-900');
+                lapResetBtn.disabled = true;
+                
+                // 과목 입력 필드 활성화
+                subjectInput.disabled = false;
+            }
+        }
+
+        // 초기 상태 설정
+        window.onload = function() {
+            display.textContent = formatTime(0);
+            lapResetBtn.disabled = true; // 시작 전에는 랩/기록 비활성화
+            subjectInput.disabled = false; // 초기에는 과목 입력 가능
+        };
+
+    </script>
+</body>
+</html>
