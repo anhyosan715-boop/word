@@ -15,7 +15,7 @@
             background-color: #f0f4f8; /* 아주 연한 배경 */
         }
 
-        /* 버튼 스타일링 (Tailwind를 보강하는 커스텀 효과) */
+        /* 주 버튼 스타일링 (Tailwind를 보강하는 커스텀 효과 - Indigo) */
         .btn-primary {
             background: linear-gradient(135deg, #4f46e5 0%, #1e40af 100%); /* Indigo Gradient */
             transition: all 0.3s ease;
@@ -27,16 +27,18 @@
             box-shadow: 0 8px 20px rgba(79, 70, 229, 0.6);
         }
         
-        /* 타이머 숫자 스타일 */
-        #timer-display {
-            font-family: 'Montserrat', sans-serif;
-            letter-spacing: 2px;
-            font-weight: 800;
-            background: linear-gradient(90deg, #10b981, #06b6d4); /* Teal/Cyan Gradient */
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        /* 타이머 버튼 스타일링 (새로운 주황색 계열 - Amber) */
+        .btn-secondary {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); /* Amber Gradient */
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
         }
-
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #fbbf24 0%, #b45309 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.6);
+        }
+        
         /* 작성소감 섹션 배경 */
         .review-section {
             background: linear-gradient(150deg, #ffffff 0%, #fef3c7 100%); /* Light background with a hint of yellow */
@@ -52,7 +54,7 @@
                 extend: {
                     colors: {
                         'primary': '#4f46e5', /* Indigo-600 */
-                        'secondary': '#10b981', /* Emerald-500 */
+                        'secondary': '#f59e0b', /* Amber-500 */
                     }
                 }
             }
@@ -68,55 +70,53 @@
                 영단어 학습 마스터
             </h1>
             <p class="text-xl text-gray-600 mb-8 max-w-2xl">
-                체계적인 단어 연습과 집중 타이머로 당신의 영어 실력을 한 단계 업그레이드하세요.
+                체계적인 단어 연습과 집중 학습을 위한 유용한 도구를 제공합니다.
             </p>
             
-            <!-- 단어 연습 버튼 (외부 링크) -->
-            <a href="https://anhyosan715-boop.github.io/word/01/" target="_blank"
-               class="inline-flex items-center justify-center btn-primary text-white font-bold py-3 px-8 rounded-xl text-lg tracking-wide transition duration-300">
-                <i data-lucide="play-circle" class="w-5 h-5 mr-2"></i>
-                단어 연습 시작하기
-            </a>
+            <!-- 핵심 기능 버튼 그룹 -->
+            <div class="flex flex-col sm:flex-row gap-4">
+                
+                <!-- 1. 단어 연습 버튼 (기존 링크 유지) -->
+                <a href="https://anhyosan715-boop.github.io/word/01/" target="_blank"
+                   class="flex-1 inline-flex items-center justify-center btn-primary text-white font-bold py-4 px-8 rounded-xl text-lg tracking-wide transition duration-300">
+                    <i data-lucide="spell-check" class="w-5 h-5 mr-2"></i>
+                    단어 연습 시작하기
+                </a>
+
+                <!-- 2. 학습 타이머 버튼 (새로운 링크 적용) -->
+                <a href="https://script.google.com/macros/s/AKfycbxm5clMovMSz4-Bho6T1vymVthPUYx6qFnCG7CebBeXR0Vgp3JyLePDVVncfxa42vU_FA/exec" target="_blank"
+                   class="flex-1 inline-flex items-center justify-center btn-secondary text-white font-bold py-4 px-8 rounded-xl text-lg tracking-wide transition duration-300">
+                    <i data-lucide="watch" class="w-5 h-5 mr-2"></i>
+                    학습 타이머 이용하기
+                </a>
+            </div>
         </header>
 
-        <!-- Main Content Area -->
+        <!-- Main Content Area (Simplified Layout) -->
         <main class="grid grid-cols-1 lg:grid-cols-3 gap-10">
 
-            <!-- 1. 학습 타이머 섹션 -->
+            <!-- 1. 앱 소개 카드 (단독 섹션 제거 후 소개 카드로 대체) -->
             <div class="lg:col-span-2 bg-white p-6 sm:p-10 rounded-3xl shadow-xl transition hover:shadow-2xl border border-gray-100">
                 <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
-                    <i data-lucide="clock" class="w-6 h-6 text-secondary mr-2"></i>
-                    집중 학습 타이머
+                    <i data-lucide="book-open-text" class="w-6 h-6 text-primary mr-2"></i>
+                    앱 소개 및 주요 기능
                 </h2>
-                <p class="text-gray-500 mb-8">
-                    공부 시간을 측정하고 집중력을 유지하세요. 목표 시간은 25분(뽀모도로 기준)입니다.
-                </p>
-
-                <!-- Timer Display -->
-                <div id="timer-display" class="text-8xl sm:text-9xl text-center mb-8 font-extrabold select-none">
-                    25:00
+                <div class="space-y-6 text-gray-600">
+                    <p>
+                        이 영단어 학습 앱은 사용자가 능동적으로 단어를 익힐 수 있도록 두 가지 핵심 기능을 제공합니다.
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>
+                            <strong class="text-primary">단어 연습:</strong> 웹사이트를 통해 등록된 단어 리스트를 활용하여 실제 연습 문제를 풀어볼 수 있습니다. 학습 진도를 쉽게 파악하고 반복 학습에 최적화되어 있습니다.
+                        </li>
+                        <li>
+                            <strong class="text-secondary">학습 타이머:</strong> 집중력을 높이는 데 도움을 주는 타이머 웹 페이지로 이동합니다. 학습 시간을 정확하게 기록하고 관리하여 자기 주도 학습 습관을 형성할 수 있도록 지원합니다.
+                        </li>
+                    </ul>
+                    <p class="pt-4 border-t border-gray-200 text-sm italic text-gray-500">
+                        * 각 버튼을 클릭하면 해당 기능의 전문 웹 페이지로 이동합니다.
+                    </p>
                 </div>
-
-                <!-- Timer Controls -->
-                <div class="flex justify-center space-x-4">
-                    <button id="timer-start"
-                            class="flex items-center bg-green-500 text-white font-semibold py-3 px-6 rounded-full shadow-md hover:bg-green-600 transition duration-150 disabled:opacity-50">
-                        <i data-lucide="play" class="w-5 h-5 mr-2"></i>
-                        시작
-                    </button>
-                    <button id="timer-pause"
-                            class="flex items-center bg-yellow-500 text-white font-semibold py-3 px-6 rounded-full shadow-md hover:bg-yellow-600 transition duration-150 disabled:opacity-50" disabled>
-                        <i data-lucide="pause" class="w-5 h-5 mr-2"></i>
-                        일시정지
-                    </button>
-                    <button id="timer-reset"
-                            class="flex items-center bg-red-500 text-white font-semibold py-3 px-6 rounded-full shadow-md hover:bg-red-600 transition duration-150">
-                        <i data-lucide="rotate-ccw" class="w-5 h-5 mr-2"></i>
-                        초기화
-                    </button>
-                </div>
-                
-                <p id="timer-message" class="text-center mt-6 text-sm font-medium text-gray-500 min-h-[1.5rem]"></p>
             </div>
 
             <!-- 2. 작성자 정보 카드 -->
@@ -144,9 +144,9 @@
             </h2>
             <div class="space-y-4 text-gray-700 leading-relaxed bg-white p-5 rounded-xl shadow-inner">
                 <p>
-                    바이브코딩 프로젝트를 통해 영단어 학습 앱을 기획하고 구현하는 과정을 경험할 수 있었습니다. 
-                    특히, Tailwind CSS를 활용하여 모바일과 데스크톱 환경 모두에서 사용하기 편리한 반응형 웹 디자인을 적용하는 데 중점을 두었습니다. 
-                    단순한 단어 암기를 넘어, 게임과 타이머 기능을 통해 학습에 재미 요소를 더하고자 노력했습니다.
+                    바이브코딩 프로젝트를 통해 영단어 학습 앱의 랜딩 페이지를 기획하고 구현하는 과정을 경험할 수 있었습니다. 
+                    Tailwind CSS를 활용하여 모바일 친화적인 모던한 디자인을 구현하는 데 중점을 두었습니다. 
+                    사용자가 쉽게 단어 연습과 학습 도구에 접근할 수 있도록 직관적인 인터페이스를 구성하고자 노력했습니다.
                 </p>
                 <p class="text-sm font-semibold text-yellow-600">
                     - 안효산 (부산기계공업고등학교)
@@ -157,85 +157,8 @@
     </div>
 
     <script>
+        // Lucide 아이콘 초기화
         lucide.createIcons();
-
-        // === Study Timer Logic ===
-        let timerInterval;
-        let running = false;
-        let totalSeconds = 25 * 60; // 25 minutes target
-        const display = document.getElementById('timer-display');
-        const startBtn = document.getElementById('timer-start');
-        const pauseBtn = document.getElementById('timer-pause');
-        const resetBtn = document.getElementById('timer-reset');
-        const messageDisplay = document.getElementById('timer-message');
-
-        function updateDisplay() {
-            const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-            const seconds = String(totalSeconds % 60).padStart(2, '0');
-            display.textContent = `${minutes}:${seconds}`;
-
-            // 탭 제목에도 시간 표시 (선택 사항)
-            document.title = `(${minutes}:${seconds}) 영단어 학습 마스터`;
-        }
-        
-        function startTimer() {
-            if (running) return;
-            running = true;
-            
-            startBtn.disabled = true;
-            pauseBtn.disabled = false;
-            
-            messageDisplay.textContent = '⏱️ 학습에 집중하세요!';
-
-            timerInterval = setInterval(() => {
-                totalSeconds--;
-                updateDisplay();
-
-                if (totalSeconds <= 0) {
-                    clearInterval(timerInterval);
-                    running = false;
-                    startBtn.disabled = true;
-                    pauseBtn.disabled = true;
-                    messageDisplay.textContent = '🎉 학습 시간 완료! 잠시 휴식하세요.';
-                    display.classList.add('animate-pulse'); // 완료 애니메이션
-                    // 타이머 완료 시 탭 제목 원상 복구
-                    document.title = '영단어 학습 마스터 - 랜딩 페이지'; 
-                }
-            }, 1000);
-        }
-
-        function pauseTimer() {
-            if (!running) return;
-            clearInterval(timerInterval);
-            running = false;
-            startBtn.disabled = false;
-            pauseBtn.disabled = true;
-            messageDisplay.textContent = '⏸️ 일시 정지됨. 다시 시작 버튼을 누르세요.';
-        }
-
-        function resetTimer() {
-            clearInterval(timerInterval);
-            running = false;
-            totalSeconds = 25 * 60; // 25 minutes
-            updateDisplay();
-            startBtn.disabled = false;
-            pauseBtn.disabled = true;
-            display.classList.remove('animate-pulse');
-            messageDisplay.textContent = '타이머가 25분으로 초기화되었습니다.';
-            // 탭 제목 원상 복구
-            document.title = '영단어 학습 마스터 - 랜딩 페이지'; 
-        }
-
-        // Event Listeners
-        startBtn.addEventListener('click', startTimer);
-        pauseBtn.addEventListener('click', pauseTimer);
-        resetBtn.addEventListener('click', resetTimer);
-
-        // Initial setup
-        window.onload = () => {
-            updateDisplay();
-            messageDisplay.textContent = '타이머를 시작하여 집중하세요.';
-        };
     </script>
 </body>
 </html>
