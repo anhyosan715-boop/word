@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>단어 학습 마스터</title>
+    <!-- Tailwind CSS CDN 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN 로드 -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 기본 스타일 설정 */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        
+        /* --- 플래시카드 뒤집기 공통 CSS --- */
+        .card-container {
+            perspective: 1000px;
+            height: 12rem; /* 카드 높이 고정 (단어장 그리드 모드) */
+            width: 100%;
+        }
+        /* 플래시카드 (단일 모드)에서 사용하는 더 큰 카드 스타일 */
+        .single-card-container {
+            perspective: 1000px;
+            height: 20rem; /* 단일 카드 높이 증가 */
+            width: 100%;
+            max-width: 400px; /* 최대 너비 제한 */
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15); /* 그림자 강화 */
+        }
+        .card-front {
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+        .card-back {
+            background-color: #4f46e5;
+            color: white;
+            transform: rotateY(180deg);
+        }
+        
+        /* 공통 애니메이션 */
+        .list-item, .quiz-item, .card-container {
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- 단어 게임 CSS --- */
+        .game-area {
+            position: relative;
+            height: 60vh; /* 게임 영역 높이 */
+            background-color: #eef2ff; /* 연한 보라색 배경 */
+            border: 4px solid #4f46e5;
+            overflow: hidden;
+            border-radius: 1rem;
+        }
+
+        .falling-word {
+            position: absolute;
+            top: 0;
+            white-space: nowrap;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            background-color: rgba(79, 70, 229, 0.9); /* Indigo */
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+            opacity: 1;
+            /* 맞췄을 때의 애니메이션을 위해 transition 추가 */
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out; 
+            z-index: 10;
+            min-width: 50px; /* 최소 너비 보장 */
+            text-align: center;
+            user-select: none; /* 드래그 방지 */
+        }
+        
+        .falling-word.hit {
+            opacity: 0;
+            transform: scale(1.5); /* 맞췄을 때 튀어나가는 효과 */
+        }
+        
+        .falling-word.missed {
+            background-color: rgba(239, 68, 68, 0.9); /* Red */
+        }
+        
+        .game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            border-radius: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8">
+
+    <div id="app" class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <header class="bg-white p-4 mb-6 rounded-xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center mb-3 sm:mb-0">
+                <i data-lucide="book-open-text" class="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 mr-3"></i>
+                단어 학습 마스터
+            </h1>
+            
+            <!-- Mode Selection Buttons -->
+            <div class="flex flex-wrap gap-2 text-sm sm:text-base">
+                <button id="mode-list" data-mode="list" class="mode-button p-2 px-4 rounded-lg font-semibold bg-indigo-600 text-white shadow-md transition duration-150">
+                    <i data-lucide="layout-grid" class="w-4 h-4 mr-1 inline-block"></i> 단어장
+                </button>
+                <button id="mode-flashcard" data-mode="flashcard" class="mode-button p-2 px-4 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-indigo-100 transition duration-150">
+                    <i data-lucide="align-horizontal-distribute-center" class="w-4 h-4 mr-1 inline-block"></i> 플래시카드
+                </button>
+                <button id="mode-quiz" data-mode="quiz" class="mode-button p-2 px-4 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-indigo-100 transition duration-150">
+                    <i data-lucide="help-circle" class="w-4 h-4 mr-1 inline-block"></i> 퀴즈
+                </button>
+                <button id="mode-game" data-mode="game" class="mode-button p-2 px-4 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-indigo-100 transition duration-150">
+                    <i data-lucide="zap" class="w-4 h-4 mr-1 inline-block"></i> 단어 게임
+                </button>
+            </div>
+        </header>
+
+        <!-- Common Controls (Search/Filter) - Visible only in List/Flashcard Mode -->
+        <div id="common-controls" class="bg-white p-4 rounded-xl shadow-lg mb-6 flex flex-col md:flex-row gap-4">
+            <!-- Search Input -->
+            <input type="text" id="search-input" placeholder="한국어 또는 영어 단어 검색..."
+                   class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+
+            <!-- Category Filter -->
+            <select id="category-filter"
+                    class="p-3 border border-gray-300 rounded-lg bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 md:w-1/4">
+                <option value="">전체 분류</option>
+                <!-- Options will be populated by JS -->
+            </select>
+            
+            <!-- Word Count -->
+            <span id="word-count" class="text-lg font-medium text-gray-500 bg-gray-100 px-3 py-2 rounded-lg flex items-center justify-center sm:justify-start">
+                총 0개 단어
+            </span>
+        </div>
+
+        <!-- Dynamic Content Area -->
+        <div id="content-area">
+            <!-- Content will be rendered here based on the selected mode -->
+            <p id="loading-message" class="col-span-full text-center text-gray-500 mt-10">데이터 로드 중...</p>
+        </div>
+        
+        <!-- No Results Message -->
+        <div id="no-results" class="hidden text-center text-gray-500 mt-10 p-6 bg-yellow-50 rounded-lg border border-yellow-200">
+            <i data-lucide="info" class="w-8 h-8 mx-auto text-yellow-500 mb-3"></i>
+            <p class="text-lg">검색 결과가 없습니다. 다른 검색어를 시도해 보세요.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Lucide Icons 초기화
+        lucide.createIcons();
+
+        // 사용자 제공 CSV 데이터 (직접 삽입)
+        const csvData = `No.,분류,한국어 단어,영어 단어
+1,감정,행복한,happy
+2,감정,기쁜,delighted
+3,감정,만족한,satisfied
+4,감정,놀라운,amazed
+5,감정,자랑스러운,proud
+6,감정,자신있는,confident
+7,감정,건강한,healthy
+8,감정,아픈,sick
+9,감정,흥미로운,interested
+10,감정,흥분한,excited
+11,감정,안심된다,jealous
+12,감정,짜증나는,annoyed
+13,감정,화난,angry
+14,감정,걱정하는,worried
+15,감정,난처한,embarrassing
+16,감정,외로운,lonely
+17,감정,무서운,afraid
+18,감정,겁나는,scared
+19,감정,실망한,disappointed
+20,상태,배고픈,hungry
+21,상태,졸린,sleepy
+22,상태,목마른,thirsty
+23,상태,배부른,full
+24,상태,피곤한,tired
+25,상태,지친,exhausted
+26,성격,정직한,honest
+27,성격,신중한,cautious
+28,성격,긍정적인,Positive
+29,성격,부정적인,negative
+30,성격,진지한,serious
+31,성격,즐거운,fun
+32,성격,웃긴,funny
+33,성격,조용한,quiet
+34,성격,수줍은,shy
+35,성격,내향적인,introverted
+36,성격,외향적인,extroverted
+37,성격,유머러스한,humorous
+38,성격,용감한,Brave
+39,성격,잔인한,cruel
+40,성격,호기심많은,furious
+41,성격,부지런한,diligent
+42,성격,게으른,Lazy
+43,성격,성실한,sincere
+44,성격,친절한,kind
+45,성격,다정한,sweet
+46,성격,이기적인,selfish
+47,성격,외로운,solitary
+48,성격,온화한,gentle
+49,성격,까다로운,picky
+50,성격,낙천적인,optimistic
+51,성격,비관적인,pessimistic
+52,성격,충동적인,impulsive
+53,성격,자발적인,spontaneous
+54,성격,협력하는,cooperative
+55,성격,열정적인,passionate
+56,성격,겸손한,humble
+57,성격,경험있는,experienced
+58,성격,재능있는,talented
+59,성격,영리한,clever
+60,성격,현명한,wise
+61,성격,단호한,firm
+62,성격,이성적인,rational
+63,성격,감정적인,emotional
+64,성격,신뢰할수있는,trustworthy
+65,성격,믿을수없는,unreliable
+66,성격,정확한,accurate
+67,성격,정확하지않은,inaccurate
+68,성격,능숙한,skillful
+69,성격,미숙한,unskilled
+70,성격,창조적인,creative
+71,성격,모방하는,imitative
+72,성격,호의적인,favorable
+73,성격,비호의적인,unfavorable
+74,성격,지루한,boring
+75,성격,즐거운,pleasant
+76,성격,어색한,awkward
+77,성격,편안한,comfortable
+78,성격,불편한,uncomfortable
+79,성격,쉬운,easy
+80,성격,어려운,difficult
+81,성격,가능한,possible
+82,성격,불가능한,impossible
+83,성격,가치있는,valuable
+84,성격,가치없는,worthless
+85,성격,저렴한,cheap
+86,성격,비싼,expensive
+87,성격,필수적인,essential
+88,성격,불필요한,unnecessary
+89,성격,일반적인,general
+90,성격,구체적인,specific
+91,성격,중요한,important
+92,성격,하찮은,trivial
+93,성격,명확한,clear
+94,성격,불명확한,unclear
+95,성격,적합한,suitable
+96,성격,부적합한,unsuitable
+97,성격,합법적인,legal
+98,성격,불법적인,illegal
+99,성격,현실적인,realistic
+100,성격,비현실적인,unrealistic`;
+
+        let words = [];
+        let categories = new Set();
+        let currentMode = 'list'; // 초기 모드
+        let filteredWords = []; // 현재 필터링된 단어 목록
+
+        // Flashcard State
+        let currentFlashcardIndex = 0;
+
+        // Quiz State
+        let currentQuizIndex = 0;
+        let score = 0;
+        let quizAnswered = false;
+        
+        // --- Game State Variables ---
+        let gameWords = []; // Array of all words used in the game
+        let activeWords = []; // Currently falling word objects
+        let gameInterval; // Spawning interval ID
+        let gameFrame; // Animation frame ID
+        let gameScore = 0;
+        let gameLives = 5;
+        let gameSpeed = 1.0; // Base speed multiplier
+        let gameSpawnRate = 2000; // ms between spawns
+        let gameStatus = 'ready'; 
+
+
+        const contentArea = document.getElementById('content-area');
+        const commonControls = document.getElementById('common-controls');
+        const searchInput = document.getElementById('search-input');
+        const categoryFilter = document.getElementById('category-filter');
+        const wordCountSpan = document.getElementById('word-count');
+        const noResults = document.getElementById('no-results');
+        const modeButtons = document.querySelectorAll('.mode-button');
+        const loadingMessage = document.getElementById('loading-message');
+
+        // === 1. Data Parsing & Filtering ===
+
+        // CSV 데이터를 파싱하여 words 배열을 채우는 함수
+        function parseCSV(data) {
+            const lines = data.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            
+            const results = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                if (values.length === headers.length) {
+                    const word = {
+                        no: values[0],
+                        category: values[1],
+                        korean: values[2],
+                        english: values[3]
+                    };
+                    results.push(word);
+                    categories.add(word.category);
+                }
+            }
+            return results;
+        }
+
+        // 필터 옵션을 드롭다운에 채우는 함수
+        function populateFilters() {
+            categoryFilter.innerHTML = '<option value="">전체 분류</option>';
+            Array.from(categories).sort().forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categoryFilter.appendChild(option);
+            });
+        }
+
+        // 현재 필터 및 검색 기준으로 단어 목록을 필터링하는 함수
+        function getFilteredWords() {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const selectedCategory = categoryFilter.value;
+
+            return words.filter(word => {
+                const matchesSearch = !searchTerm || 
+                                    word.korean.toLowerCase().includes(searchTerm) || 
+                                    word.english.toLowerCase().includes(searchTerm);
+                
+                const matchesCategory = !selectedCategory || word.category === selectedCategory;
+
+                return matchesSearch && matchesCategory;
+            });
+        }
+        
+        // === 2. Rendering Functions ===
+
+        // 플래시카드 렌더링 (단일 및 그리드 모드 공통 사용)
+        function renderFlashcard(word, isSingleView = false) {
+            const containerClass = isSingleView ? 'single-card-container' : 'card-container';
+            
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = containerClass;
+            
+            const card = document.createElement('div');
+            card.className = 'card bg-transparent rounded-xl shadow-none cursor-pointer transition duration-300 h-full'; 
+            card.setAttribute('data-no', word.no);
+
+            // 단일 카드 뷰에서 텍스트 크기 조정
+            const frontTextClass = isSingleView ? 'text-5xl font-extrabold' : 'text-3xl font-bold'; 
+
+            card.innerHTML = `
+                <div class="card-inner w-full h-full">
+                    <!-- Card Front (Korean - Question/Hint) -->
+                    <div class="card-face card-front flex-col justify-center">
+                        <!-- 1. Category (Top, small font) -->
+                        <span class="text-lg font-semibold text-gray-500 mb-3">${word.category}</span>
+                        
+                        <!-- 2. Main Word (Center, large font) -->
+                        <p class="${frontTextClass} text-center text-gray-800">${word.korean}</p>
+                        
+                        <!-- 3. English Hint (Bottom, same small font as category) -->
+                        <span class="text-lg font-semibold text-indigo-600 mt-3">${word.english}</span>
+                        
+                        <span class="absolute top-3 left-3 text-xs font-semibold text-gray-400">No. ${word.no}</span>
+                    </div>
+
+                    <!-- Card Back (English - Answer) -->
+                    <div class="card-face card-back flex-col justify-center">
+                        <!-- 1. Category (Top, small font) -->
+                        <span class="text-lg font-semibold text-indigo-200 mb-3">${word.category}</span>
+                        
+                        <!-- 2. Main Word (Center, large font) -->
+                        <p class="${frontTextClass} text-center">${word.english}</p>
+                        
+                        <!-- 3. Korean Hint (Bottom, same small font as category) - 대칭을 위해 한국어 단어를 배치 -->
+                        <span class="text-lg font-semibold text-indigo-400 mt-3">${word.korean}</span>
+                        
+                        <span class="absolute top-3 left-3 text-xs font-semibold text-indigo-200">No. ${word.no}</span>
+                    </div>
+                </div>
+            `;
+            
+            card.addEventListener('click', () => {
+                card.classList.toggle('flipped');
+            });
+            
+            cardWrapper.appendChild(card);
+            return cardWrapper;
+        }
+
+        // === 3. Mode Handlers (List, Flashcard, Quiz, Game) ===
+
+        // 배열 섞기 유틸리티 (Fisher-Yates 알고리즘)
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // 단어장 모드 실행 (새로운 카드 그리드 뷰)
+        function activateListMode() {
+            commonControls.classList.remove('hidden');
+            noResults.classList.add('hidden');
+
+            const wordsToRender = getFilteredWords();
+            filteredWords = wordsToRender; 
+
+            contentArea.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
+            contentArea.innerHTML = '';
+            
+            if (wordsToRender.length === 0) {
+                noResults.classList.remove('hidden');
+            } else {
+                wordsToRender.forEach(word => {
+                    contentArea.appendChild(renderFlashcard(word, false)); // Grid view, not single
+                });
+            }
+            wordCountSpan.textContent = `총 ${wordsToRender.length}개 단어`;
+            lucide.createIcons();
+        }
+
+        // 플래시카드 모드 실행 (단일 카드 넘기기 뷰)
+        function activateFlashcardMode() {
+            commonControls.classList.remove('hidden'); 
+            noResults.classList.add('hidden');
+            
+            const wordsToLoad = getFilteredWords();
+            filteredWords = wordsToLoad;
+
+            // 필터링된 단어가 없으면 메시지 표시
+            if (filteredWords.length === 0) {
+                noResults.classList.remove('hidden');
+                contentArea.innerHTML = '';
+                wordCountSpan.textContent = `총 0개 단어`;
+                return;
+            }
+            noResults.classList.add('hidden');
+            
+            // 인덱스 초기화 및 단일 카드 뷰 렌더링
+            currentFlashcardIndex = 0;
+            renderSingleFlashcardContainer();
+            updateSingleFlashcard();
+        }
+        
+        // 단일 플래시카드 뷰의 컨테이너를 렌더링
+        function renderSingleFlashcardContainer() {
+            contentArea.className = 'flex flex-col items-center justify-center p-4 min-h-[40vh]'; // 중앙 정렬 및 최소 높이
+            contentArea.innerHTML = `
+                <div class="flex items-center justify-center w-full max-w-lg space-x-4">
+                    <!-- Prev Button -->
+                    <button id="prev-card" class="p-3 bg-white rounded-full shadow-lg hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="이전 카드">
+                        <i data-lucide="chevron-left" class="w-6 h-6 text-indigo-600"></i>
+                    </button>
+                    
+                    <!-- Card Display Area -->
+                    <div id="single-card-display" class="flex-shrink-0 w-full flex justify-center">
+                        <!-- Single Card will be inserted here -->
+                    </div>
+
+                    <!-- Next Button -->
+                    <button id="next-card" class="p-3 bg-white rounded-full shadow-lg hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="다음 카드">
+                        <i data-lucide="chevron-right" class="w-6 h-6 text-indigo-600"></i>
+                    </button>
+                </div>
+                
+                <p id="card-status" class="mt-6 text-lg font-medium text-gray-600"></p>
+            `;
+
+            // 이벤트 리스너 연결
+            document.getElementById('prev-card').addEventListener('click', () => navigateFlashcard(-1));
+            document.getElementById('next-card').addEventListener('click', () => navigateFlashcard(1));
+            
+            lucide.createIcons();
+        }
+
+        // 현재 인덱스에 맞춰 단일 플래시카드를 업데이트
+        function updateSingleFlashcard() {
+            const cardDisplay = document.getElementById('single-card-display');
+            const cardStatus = document.getElementById('card-status');
+            const prevButton = document.getElementById('prev-card');
+            const nextButton = document.getElementById('next-card');
+
+            if (!cardDisplay || filteredWords.length === 0) return;
+
+            // 1. 카드 렌더링
+            cardDisplay.innerHTML = '';
+            const currentWord = filteredWords[currentFlashcardIndex];
+            cardDisplay.appendChild(renderFlashcard(currentWord, true)); // Single view
+            
+            // 2. 상태 업데이트
+            cardStatus.textContent = `${currentFlashcardIndex + 1} / ${filteredWords.length}`;
+            
+            // 3. 버튼 상태 업데이트
+            prevButton.disabled = currentFlashcardIndex === 0;
+            nextButton.disabled = currentFlashcardIndex === filteredWords.length - 1;
+        }
+
+        // 플래시카드 탐색
+        function navigateFlashcard(direction) {
+            const newIndex = currentFlashcardIndex + direction;
+            if (newIndex >= 0 && newIndex < filteredWords.length) {
+                currentFlashcardIndex = newIndex;
+                updateSingleFlashcard();
+            }
+        }
+
+        // 퀴즈 모드 실행
+        function activateQuizMode() {
+            commonControls.classList.add('hidden'); // 검색/필터 숨기기
+            noResults.classList.add('hidden');
+            
+            // 퀴즈는 전체 단어로 진행하며, 필터링된 단어 개수를 표시함 (목록/카드 모드와 다름)
+            filteredWords = words; 
+
+            if (filteredWords.length === 0) {
+                contentArea.innerHTML = '<p class="text-center text-red-500 mt-10">퀴즈를 시작할 단어가 없습니다.</p>';
+                wordCountSpan.textContent = `총 0개 단어`;
+                return;
+            }
+
+            wordCountSpan.textContent = `총 ${filteredWords.length}개 단어`;
+            renderQuizUI();
+        }
+        
+        // 퀴즈 로직 (이전과 동일)
+        function renderQuizUI() {
+            contentArea.className = 'flex flex-col items-center';
+            contentArea.innerHTML = `
+                <div id="quiz-area" class="bg-white p-6 rounded-xl shadow-lg flex flex-col items-center w-full max-w-lg">
+                    <p id="quiz-score" class="text-xl font-medium text-gray-700 mb-4">점수: 0 / ${filteredWords.length}</p>
+                    <div id="quiz-question-card" class="bg-indigo-50 p-8 rounded-xl shadow-inner w-full max-w-sm text-center mb-6 h-40 flex flex-col justify-center">
+                        <p id="quiz-question" class="text-3xl font-bold text-gray-800">질문을 로드합니다...</p>
+                        <span id="quiz-category" class="text-sm font-semibold text-indigo-600 mt-2"></span>
+                    </div>
+                    <div id="quiz-status" class="text-lg font-semibold h-8 mb-4"></div>
+                    
+                    <input type="text" id="quiz-answer-input" placeholder="정답 (영어)을 입력하세요"
+                           class="p-3 border border-gray-300 rounded-lg w-full max-w-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 mb-4">
+                           
+                    <button id="quiz-submit" class="p-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150 shadow-md w-full max-w-sm">
+                        정답 제출 및 다음 문제
+                    </button>
+                    
+                    <button id="quiz-restart" class="p-3 mt-4 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition duration-150 shadow-md w-full max-w-sm hidden">
+                        퀴즈 다시 시작
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('quiz-submit').addEventListener('click', checkQuizAnswer);
+            document.getElementById('quiz-answer-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') checkQuizAnswer();
+            });
+            document.getElementById('quiz-restart').addEventListener('click', startQuiz);
+            
+            startQuiz();
+        }
+
+        function startQuiz() {
+            filteredWords = shuffleArray(words);
+            currentQuizIndex = 0;
+            score = 0;
+            quizAnswered = false;
+
+            document.getElementById('quiz-score').textContent = `점수: 0 / ${filteredWords.length}`;
+            document.getElementById('quiz-restart').classList.add('hidden');
+            document.getElementById('quiz-submit').classList.remove('hidden');
+            document.getElementById('quiz-answer-input').value = '';
+            document.getElementById('quiz-answer-input').disabled = false;
+            document.getElementById('quiz-status').textContent = '';
+            document.getElementById('quiz-question-card').classList.remove('bg-green-100', 'bg-red-100');
+            
+            loadQuizQuestion();
+        }
+
+        function loadQuizQuestion() {
+            if (currentQuizIndex >= filteredWords.length) {
+                document.getElementById('quiz-question').textContent = '퀴즈 종료!';
+                document.getElementById('quiz-category').textContent = `최종 점수: ${score} / ${filteredWords.length}`;
+                document.getElementById('quiz-submit').classList.add('hidden');
+                document.getElementById('quiz-restart').classList.remove('hidden');
+                document.getElementById('quiz-answer-input').value = '';
+                document.getElementById('quiz-answer-input').disabled = true;
+                document.getElementById('quiz-status').textContent = '';
+                return;
+            }
+
+            const currentWord = filteredWords[currentQuizIndex];
+            document.getElementById('quiz-question').textContent = currentWord.korean;
+            document.getElementById('quiz-category').textContent = `분류: ${currentWord.category} (No. ${currentWord.no})`;
+            document.getElementById('quiz-answer-input').value = '';
+            document.getElementById('quiz-answer-input').disabled = false;
+            document.getElementById('quiz-submit').textContent = '정답 제출';
+            document.getElementById('quiz-status').textContent = '';
+            document.getElementById('quiz-question-card').classList.remove('bg-green-100', 'bg-red-100');
+            quizAnswered = false;
+        }
+
+        function checkQuizAnswer() {
+            const answerInput = document.getElementById('quiz-answer-input');
+            const statusElement = document.getElementById('quiz-status');
+            const cardElement = document.getElementById('quiz-question-card');
+            
+            if (quizAnswered) {
+                currentQuizIndex++;
+                loadQuizQuestion();
+                return;
+            }
+
+            const currentWord = filteredWords[currentQuizIndex];
+            const userAnswer = answerInput.value.trim().toLowerCase();
+            const correctAnswer = currentWord.english.toLowerCase();
+
+            if (userAnswer === correctAnswer) {
+                score++;
+                statusElement.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5 mr-1 inline-block text-green-600"></i> <span class="text-green-600">정답!</span>`;
+                cardElement.classList.add('bg-green-100');
+            } else {
+                statusElement.innerHTML = `<i data-lucide="x-circle" class="w-5 h-5 mr-1 inline-block text-red-600"></i> <span class="text-red-600">오답입니다. 정답: ${currentWord.english}</span>`;
+                cardElement.classList.add('bg-red-100');
+            }
+            
+            document.getElementById('quiz-score').textContent = `점수: ${score} / ${filteredWords.length}`;
+            answerInput.disabled = true;
+            document.getElementById('quiz-submit').textContent = '다음 문제';
+            quizAnswered = true;
+            
+            lucide.createIcons();
+        }
+        
+        /**
+         * 게임 영역 중앙에 임시 알림 메시지를 표시합니다.
+         * @param {string} message - 표시할 메시지
+         * @param {string} colorClass - 텍스트 색상을 위한 Tailwind 클래스 (예: 'text-yellow-400')
+         */
+        function showGameNotification(message, colorClass) {
+            const notification = document.getElementById('game-notification');
+            if (notification) {
+                notification.textContent = message;
+                // 이전 클래스 제거 및 새로운 스타일 설정
+                notification.className = `absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-4 text-3xl font-extrabold rounded-xl shadow-2xl z-30 transition duration-300 ease-in-out bg-black bg-opacity-70 text-white pointer-events-none ${colorClass}`;
+                notification.style.opacity = 1;
+
+                // 2초 후 서서히 사라지게 함
+                setTimeout(() => {
+                    notification.style.opacity = 0;
+                    // 트랜지션 완료 후 상태 리셋
+                    setTimeout(() => {
+                        notification.textContent = '';
+                        // 기본 클래스로 복구
+                        notification.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-4 text-3xl font-extrabold rounded-xl shadow-2xl z-30 transition duration-300 ease-in-out opacity-0 pointer-events-none';
+                    }, 500); // CSS transition duration
+                }, 2000);
+            }
+        }
+
+
+        // === 4. Game Mode Logic ===
+
+        function activateGameMode() {
+            commonControls.classList.add('hidden'); // 검색/필터 숨기기
+            noResults.classList.add('hidden');
+            
+            gameWords = shuffleArray(words);
+
+            if (gameWords.length === 0) {
+                contentArea.innerHTML = '<p class="text-center text-red-500 mt-10">게임을 시작할 단어가 없습니다.</p>';
+                return;
+            }
+
+            wordCountSpan.textContent = `총 ${gameWords.length}개 단어`;
+            renderGameUI();
+        }
+
+        function renderGameUI() {
+            contentArea.className = 'flex flex-col items-center p-4';
+            contentArea.innerHTML = `
+                <div class="bg-white p-4 rounded-xl shadow-lg w-full max-w-4xl mb-4 flex justify-between items-center font-bold text-lg">
+                    <span id="game-score-display" class="text-indigo-600">점수: 0</span>
+                    <span id="game-lives-display" class="text-red-500">생명: </span>
+                </div>
+                
+                <div id="game-area" class="game-area w-full max-w-4xl">
+                    <!-- Game Notification Area (for Easter Egg, etc.) -->
+                    <div id="game-notification" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-4 text-3xl font-extrabold rounded-xl shadow-2xl z-30 transition duration-300 ease-in-out opacity-0 pointer-events-none"></div>
+
+                    <div id="game-over-overlay" class="game-over-overlay hidden">
+                        <p class="text-4xl font-extrabold mb-4">게임 오버!</p>
+                        <p class="text-2xl mb-6">최종 점수: <span id="final-score" class="text-yellow-400 font-extrabold">0</span></p>
+                        <button id="game-restart-button" class="p-3 px-6 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150 shadow-lg">
+                            다시 시작
+                        </button>
+                    </div>
+                </div>
+
+                <input type="text" id="game-input" placeholder="여기에 영어 번역을 입력하세요..."
+                       class="p-3 border-4 border-indigo-500 rounded-lg w-full max-w-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 mt-4 text-lg font-mono disabled:opacity-75"
+                       disabled>
+
+                <button id="game-start-button" class="p-3 px-6 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition duration-150 shadow-lg w-full max-w-sm mt-4">
+                    게임 시작
+                </button>
+            `;
+
+            document.getElementById('game-start-button').addEventListener('click', startGame);
+            document.getElementById('game-input').addEventListener('input', checkWordMatch);
+            // restart button listener is added in startGame() since it's inside the overlay
+        }
+
+        // 단어 생성 로직
+        function spawnWord() {
+            if (gameWords.length === 0) return;
+
+            // 이미 사용된 단어는 다시 쓰지 않거나, 전체 단어 목록에서 랜덤 선택
+            const wordData = gameWords[Math.floor(Math.random() * gameWords.length)];
+            
+            const gameArea = document.getElementById('game-area');
+            const areaWidth = gameArea.clientWidth;
+
+            const wordElement = document.createElement('div');
+            wordElement.className = 'falling-word';
+            wordElement.textContent = wordData.korean;
+            
+            // 텍스트 너비가 정해지지 않았으므로, 렌더링 후 x 위치를 설정하여 오버플로우 방지
+            gameArea.appendChild(wordElement);
+            
+            const elementWidth = wordElement.offsetWidth;
+            const randomX = Math.random() * (areaWidth - elementWidth - 40) + 20; // 20px 여백
+            wordElement.style.left = `${randomX}px`;
+            wordElement.style.top = '0px';
+
+            const fallingWord = {
+                id: Date.now() + Math.random(),
+                korean: wordData.korean,
+                english: wordData.english,
+                element: wordElement,
+                x: randomX,
+                y: 0,
+                speed: (Math.random() * 0.5 + 0.8) * gameSpeed, // 0.8 to 1.3 speed variation
+                isHit: false
+            };
+
+            activeWords.push(fallingWord);
+        }
+
+        // 애니메이션 루프 (단어 떨어뜨리기)
+        function animateGame() {
+            const gameArea = document.getElementById('game-area');
+            if (!gameArea) return;
+            const areaHeight = gameArea.clientHeight;
+            
+            let isGameOver = false;
+            let wordsToRemove = [];
+
+            // 기존 단어를 움직이고 상태 확인
+            activeWords.forEach(word => {
+                if (word.isHit) {
+                    wordsToRemove.push(word);
+                    return;
+                }
+
+                word.y += word.speed;
+                word.element.style.transform = `translateY(${word.y}px)`;
+
+                // 놓친 단어 확인 (바닥과 충돌)
+                if (word.y > areaHeight - 30) { // 30px buffer
+                    word.element.classList.add('missed');
+                    wordsToRemove.push(word);
+                    
+                    gameLives--;
+                    updateGameInfo();
+
+                    if (gameLives <= 0) {
+                        isGameOver = true;
+                    }
+                }
+            });
+
+            // 제거 목록에 있는 단어를 DOM에서 제거
+            wordsToRemove.forEach(word => {
+                if (word.element && word.element.parentElement === gameArea) {
+                    gameArea.removeChild(word.element);
+                }
+            });
+
+            // activeWords 업데이트 (놓친 단어와 맞춘 단어 제거)
+            activeWords = activeWords.filter(word => !wordsToRemove.includes(word));
+            
+            if (isGameOver) {
+                endGame();
+                return;
+            }
+
+            if (gameStatus === 'playing') {
+                gameFrame = requestAnimationFrame(animateGame);
+            }
+        }
+
+        // 입력 매칭 로직
+        function checkWordMatch(event) {
+            const input = event.target;
+            const userInput = input.value.trim().toLowerCase();
+
+            if (userInput.length === 0) return;
+
+            // --- EASTER EGG CHECK ---
+            const secretWord = 'gemini';
+            if (userInput === secretWord) {
+                // 이스터에그 발동
+                gameScore += 5;
+                gameLives = 5; // 생명 전체 회복
+                updateGameInfo();
+                
+                // 알림 표시
+                showGameNotification('제미나이 보너스! 생명 회복 및 +5점 획득!', 'text-yellow-400');
+                
+                input.value = ''; // 입력 초기화
+                return; 
+            }
+            // ------------------------
+
+            let matchFound = false;
+
+            // 현재 입력과 정확히 일치하는 단어를 찾습니다.
+            const matchingWord = activeWords.find(word => 
+                !word.isHit && word.english.toLowerCase() === userInput
+            );
+
+            if (matchingWord) {
+                matchingWord.isHit = true;
+                matchingWord.element.classList.add('hit');
+                
+                // CSS 트랜지션 후 DOM에서 요소 제거
+                setTimeout(() => {
+                    const gameArea = document.getElementById('game-area');
+                    if (gameArea && matchingWord.element.parentElement === gameArea) {
+                        gameArea.removeChild(matchingWord.element);
+                        // activeWords 배열에서도 제거
+                        activeWords = activeWords.filter(word => word.id !== matchingWord.id);
+                    }
+                }, 300); // Wait for hit animation (0.2s)
+
+                gameScore++;
+                // 난이도 상승 (점수가 10점의 배수일 때)
+                if (gameScore % 10 === 0 && gameSpeed < 2.5) {
+                    gameSpeed += 0.1;
+                    if (gameSpawnRate > 500) {
+                         gameSpawnRate = Math.max(500, gameSpawnRate - 100);
+                         clearInterval(gameInterval);
+                         gameInterval = setInterval(spawnWord, gameSpawnRate);
+                    }
+                }
+                
+                updateGameInfo();
+                input.value = ''; // 성공적인 매칭 시 입력 지우기
+                matchFound = true;
+            }
+        }
+
+        // 게임 상태 관리
+        function startGame() {
+            // Reset state
+            gameScore = 0;
+            gameLives = 5;
+            gameSpeed = 1.0; 
+            gameSpawnRate = 2000;
+            activeWords = [];
+            gameStatus = 'playing';
+
+            // Clear previous elements and remove old event listeners from restart button
+            const gameArea = document.getElementById('game-area');
+            if (gameArea) {
+                 // 게임 오버 오버레이 내의 모든 자식 요소 제거
+                Array.from(gameArea.children).forEach(child => {
+                    if (child.id !== 'game-over-overlay' && child.id !== 'game-notification') {
+                        gameArea.removeChild(child);
+                    }
+                });
+            }
+
+
+            const restartButton = document.getElementById('game-restart-button');
+            if (restartButton) {
+                // 이벤트 리스너를 한 번만 연결하기 위해 확인
+                restartButton.onclick = null;
+                restartButton.addEventListener('click', startGame);
+            }
+
+            document.getElementById('game-input').value = '';
+            document.getElementById('game-input').disabled = false;
+            document.getElementById('game-input').focus();
+            document.getElementById('game-start-button').classList.add('hidden');
+            document.getElementById('game-over-overlay').classList.add('hidden');
+            
+            updateGameInfo();
+            
+            // Start Spawning and Animation
+            clearInterval(gameInterval);
+            gameInterval = setInterval(spawnWord, gameSpawnRate);
+            
+            cancelAnimationFrame(gameFrame);
+            gameFrame = requestAnimationFrame(animateGame);
+        }
+
+        function endGame() {
+            gameStatus = 'over';
+            clearInterval(gameInterval);
+            cancelAnimationFrame(gameFrame);
+            document.getElementById('game-input').disabled = true;
+
+            const finalScoreElement = document.getElementById('final-score');
+            if (finalScoreElement) {
+                finalScoreElement.textContent = gameScore;
+            }
+            
+            document.getElementById('game-over-overlay').classList.remove('hidden');
+        }
+
+        function updateGameInfo() {
+            const scoreDisplay = document.getElementById('game-score-display');
+            const livesDisplay = document.getElementById('game-lives-display');
+            
+            if (scoreDisplay) scoreDisplay.textContent = `점수: ${gameScore}`;
+            if (livesDisplay) {
+                // 하트 아이콘으로 생명 표시
+                livesDisplay.innerHTML = `생명: ${Array(Math.max(0, gameLives)).fill('<i data-lucide="heart" class="w-5 h-5 fill-red-500 text-red-500 inline-block mx-0.5"></i>').join('')}`;
+                lucide.createIcons(); // 갱신된 아이콘 다시 그리기
+            }
+        }
+
+        // === 5. Event Handlers & Initialization ===
+
+        // 모드 전환 핸들러
+        function changeMode(newMode) {
+            // 게임 모드에서 다른 모드로 전환 시, 게임을 정리합니다.
+            if (currentMode === 'game' && (gameStatus === 'playing' || gameStatus === 'ready')) {
+                clearInterval(gameInterval);
+                cancelAnimationFrame(gameFrame);
+                // 게임 영역의 모든 단어 제거
+                const gameArea = document.getElementById('game-area');
+                if (gameArea) {
+                     Array.from(gameArea.children).forEach(child => {
+                        if (child.id !== 'game-over-overlay' && child.id !== 'game-notification') {
+                            gameArea.removeChild(child);
+                        }
+                    });
+                }
+                gameStatus = 'ready';
+                activeWords = [];
+            }
+            
+            currentMode = newMode;
+            modeButtons.forEach(button => {
+                const isSelected = button.getAttribute('data-mode') === newMode;
+                button.classList.toggle('bg-indigo-600', isSelected);
+                button.classList.toggle('text-white', isSelected);
+                button.classList.toggle('bg-gray-200', !isSelected);
+                button.classList.toggle('text-gray-700', !isSelected);
+                button.classList.toggle('hover:bg-indigo-700', isSelected);
+                button.classList.toggle('hover:bg-indigo-100', !isSelected);
+            });
+
+            // 모드에 따라 적절한 함수 실행
+            if (newMode === 'list') {
+                activateListMode();
+            } else if (newMode === 'flashcard') {
+                activateFlashcardMode();
+            } else if (newMode === 'quiz') {
+                activateQuizMode();
+            } else if (newMode === 'game') {
+                activateGameMode();
+            }
+        }
+
+        // 검색/필터 이벤트 리스너: 단어장/플래시카드 모드일 때만 재렌더링
+        function handleFilterChange() {
+            if (currentMode === 'list') {
+                activateListMode();
+            } else if (currentMode === 'flashcard') {
+                // 단일 플래시카드 모드에서는 필터 변경 시 다시 처음 카드로 돌아감
+                activateFlashcardMode(); 
+            }
+        }
+
+        // 초기화 함수
+        function initialize() {
+            // 1. 데이터 파싱
+            words = parseCSV(csvData);
+
+            // 2. 필터 채우기
+            populateFilters();
+
+            // 3. 이벤트 리스너 설정
+            modeButtons.forEach(button => {
+                button.addEventListener('click', () => changeMode(button.getAttribute('data-mode')));
+            });
+            searchInput.addEventListener('input', handleFilterChange);
+            categoryFilter.addEventListener('change', handleFilterChange);
+
+            // 4. 초기 렌더링 (단어장 모드)
+            loadingMessage.classList.add('hidden');
+            changeMode('list');
+            
+            lucide.createIcons();
+        }
+
+        // 앱 시작
+        window.onload = initialize;
+
+    </script>
+</body>
+</html>
